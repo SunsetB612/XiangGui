@@ -1,0 +1,76 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.xianggui.app.mapper.UserMapper">
+
+    <select id="selectByMobile" resultType="User">
+        SELECT id, username, mobile, password_hash as passwordHash, 
+               avatar_config as avatarConfig, user_status as userStatus,
+               last_login_ip as lastLoginIp, last_login_at as lastLoginAt,
+               created_at as createdAt, updated_at as updatedAt, deleted_at as deletedAt
+        FROM users
+        WHERE mobile = #{mobile} AND deleted_at IS NULL
+    </select>
+
+    <select id="selectByUsername" resultType="User">
+        SELECT id, username, mobile, password_hash as passwordHash,
+               avatar_config as avatarConfig, user_status as userStatus,
+               last_login_ip as lastLoginIp, last_login_at as lastLoginAt,
+               created_at as createdAt, updated_at as updatedAt, deleted_at as deletedAt
+        FROM users
+        WHERE username = #{username} AND deleted_at IS NULL
+    </select>
+
+    <select id="selectById" resultType="User">
+        SELECT id, username, mobile, password_hash as passwordHash,
+               avatar_config as avatarConfig, user_status as userStatus,
+               last_login_ip as lastLoginIp, last_login_at as lastLoginAt,
+               created_at as createdAt, updated_at as updatedAt, deleted_at as deletedAt
+        FROM users
+        WHERE id = #{id} AND deleted_at IS NULL
+    </select>
+
+    <select id="existsMobile" resultType="int">
+        SELECT COUNT(*) FROM users WHERE mobile = #{mobile} AND deleted_at IS NULL
+    </select>
+
+    <select id="existsUsername" resultType="int">
+        SELECT COUNT(*) FROM users WHERE username = #{username} AND deleted_at IS NULL
+    </select>
+
+    <insert id="insert" useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO users (username, mobile, password_hash, avatar_config, user_status, created_at, updated_at)
+        VALUES (#{username}, #{mobile}, #{passwordHash}, #{avatarConfig}, #{userStatus}, NOW(), NOW())
+    </insert>
+
+    <update id="update">
+        UPDATE users
+        SET username = #{username},
+            mobile = #{mobile},
+            password_hash = #{passwordHash},
+            avatar_config = #{avatarConfig},
+            user_status = #{userStatus},
+            last_login_ip = #{lastLoginIp},
+            last_login_at = #{lastLoginAt},
+            updated_at = NOW()
+        WHERE id = #{id}
+    </update>
+
+    <update id="updatePassword">
+        UPDATE users
+        SET password_hash = #{passwordHash}, updated_at = NOW()
+        WHERE mobile = #{mobile} AND deleted_at IS NULL
+    </update>
+
+    <update id="updateLoginInfo">
+        UPDATE users
+        SET last_login_ip = #{lastLoginIp}, last_login_at = NOW(), updated_at = NOW()
+        WHERE id = #{id}
+    </update>
+
+    <update id="updateAvatarConfig">
+        UPDATE users
+        SET avatar_config = #{avatarConfig}, updated_at = NOW()
+        WHERE id = #{id}
+    </update>
+
+</mapper>
