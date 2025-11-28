@@ -2,7 +2,7 @@
 <!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
 <mapper namespace="com.xianggui.app.mapper.UserMapper">
 
-    <select id="selectByMobile" resultType="User">
+    <select id="selectByMobile" resultType="com.xianggui.app.entity.User">
         SELECT id, username, mobile, password_hash as passwordHash, 
                avatar_config as avatarConfig, user_status as userStatus,
                last_login_ip as lastLoginIp, last_login_at as lastLoginAt,
@@ -11,7 +11,7 @@
         WHERE mobile = #{mobile} AND deleted_at IS NULL
     </select>
 
-    <select id="selectByUsername" resultType="User">
+    <select id="selectByUsername" resultType="com.xianggui.app.entity.User">
         SELECT id, username, mobile, password_hash as passwordHash,
                avatar_config as avatarConfig, user_status as userStatus,
                last_login_ip as lastLoginIp, last_login_at as lastLoginAt,
@@ -20,7 +20,7 @@
         WHERE username = #{username} AND deleted_at IS NULL
     </select>
 
-    <select id="selectById" resultType="User">
+    <select id="selectById" resultType="com.xianggui.app.entity.User">
         SELECT id, username, mobile, password_hash as passwordHash,
                avatar_config as avatarConfig, user_status as userStatus,
                last_login_ip as lastLoginIp, last_login_at as lastLoginAt,
