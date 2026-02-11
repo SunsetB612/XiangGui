@@ -37,6 +37,32 @@ build/
 .trae/rules/
 .trae/skills/
 
+### Environment Configurations ###
+# 本地开发环境配置（含敏感信息）
+application-dev.yaml
+application-local.yaml
+application-local.properties
+
+# 生产环境配置（应通过环境变量注入）
+application-prod.yaml
+
+# 环境变量文件
+.env
+.env.local
+.env.*.local
+
+### Sensitive Files ###
+# 密钥文件
+*.key
+*.pem
+*.p12
+*.pfx
+keystore
+truststore
+id_rsa
+id_dsa
+.htpasswd
+
 # Compiled class file
 *.class
 
