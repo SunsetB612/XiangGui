@@ -1,34 +1,86 @@
 package com.xianggui.app.util;
 
+import com.xianggui.app.config.AppProperties;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Component;
+
 import java.util.regex.Pattern;
 
+@Component
 public class ValidationUtil {
-    private static final String MOBILE_PATTERN = "^1[3-9]\\d{9}$";
-    private static final String USERNAME_PATTERN = "^[a-zA-Z0-9_\\u4e00-\\u9fa5]{2,20}$";
-    private static final String PASSWORD_PATTERN = "^[a-zA-Z0-9!@#$%^&*_-]{6,20}$";
 
+    private static AppProperties appProperties;
+
+    @Autowired
+    public void setAppProperties(AppProperties properties) {
+        ValidationUtil.appProperties = properties;
+    }
+
+    /**
+     * 验证手机号格式
+     */
     public static boolean isValidMobile(String mobile) {
-        if (mobile == null) {
+        if (mobile == null || appProperties == null) {
             return false;
         }
-        return Pattern.matches(MOBILE_PATTERN, mobile);
+        String pattern = appProperties.getSecurity().getMobile().getPattern();
+        return Pattern.matches(pattern, mobile);
     }
 
+    /**
+     * 验证用户名格式
+     */
     public static boolean isValidUsername(String username) {
-        if (username == null) {
+        if (username == null || appProperties == null) {
             return false;
         }
-        return Pattern.matches(USERNAME_PATTERN, username);
+        String pattern = appProperties.getSecurity().getUsername().getPattern();
+        int minLength = appProperties.getSecurity().getUsername().getMinLength();
+        int maxLength = appProperties.getSecurity().getUsername().getMaxLength();
+
+        if (username.length() < minLength || username.length() > maxLength) {
+            return false;
+        }
+        return Pattern.matches(pattern, username);
     }
 
+    /**
+     * 验证密码格式
+     */
     public static boolean isValidPassword(String password) {
-        if (password == null) {
+        if (password == null || appProperties == null) {
             return false;
         }
-        return Pattern.matches(PASSWORD_PATTERN, password);
+        String pattern = appProperties.getSecurity().getPassword().getPattern();
+        int minLength = appProperties.getSecurity().getPassword().getMinLength();
+        int maxLength = appProperties.getSecurity().getPassword().getMaxLength();
+
+        if (password.length() < minLength || password.length() > maxLength) {
+            return false;
+        }
+        return Pattern.matches(pattern, password);
     }
 
+    /**
+     * 验证短信验证码格式
+     */
     public static boolean isValidCode(String code) {
-        return code != null && code.matches("^\\d{6}$");
+        if (code == null || appProperties == null) {
+            return false;
+        }
+        int length = appProperties.getCaptcha().getSms().getLength();
+        String pattern = "^\\d{" + length + "}$";
+        return code.matches(pattern);
+    }
+
+    /**
+     * 验证图形验证码格式
+     */
+    public static boolean isValidCaptchaCode(String code) {
+        if (code == null || appProperties == null) {
+            return false;
+        }
+        int length = appProperties.getCaptcha().getImage().getLength();
+        return code.length() == length;
     }
 }

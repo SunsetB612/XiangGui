@@ -1,4 +1,4 @@
-# 香榭API接口文档
+# 向归API接口文档
 
 ## 项目架构概述
 
@@ -8,7 +8,8 @@
 - **ORM**: MyBatis 3.0.3
 - **数据库**: MySQL 8.0+
 - **缓存**: Redis
-- **JSON处理**: Jackson 2.20.1
+- **JSON处理**: Jackson
+- **API文档**: OpenAPI 3.0 (SpringDoc)
 - **构建工具**: Maven 3.9.9
 
 ### 项目结构
@@ -17,6 +18,10 @@ src/
 ├── main/
 │   ├── java/com/xianggui/app/
 │   │   ├── AppApplication.java          # 启动类
+│   │   ├── config/                      # 配置类
+│   │   │   ├── AppProperties.java       # 应用配置属性
+│   │   │   ├── OpenApiConfig.java       # OpenAPI配置
+│   │   │   └── WebConfig.java           # Web配置
 │   │   ├── controller/                  # 控制层
 │   │   │   └── AuthController.java      # 认证相关接口
 │   │   ├── service/                     # 业务层
@@ -41,21 +46,320 @@ src/
 │   │   │   ├── PasswordUtil.java        # 密码处理工具
 │   │   │   ├── JwtUtil.java             # JWT令牌工具
 │   │   │   └── RedisUtil.java           # Redis操作工具
-│   │   └── common/                      # 公共类
-│   │       ├── ApiResponse.java         # 统一响应格式
-│   │       └── ErrorCode.java           # 错误码定义
+│   │   ├── common/                      # 公共类
+│   │   │   ├── ApiResponse.java         # 统一响应格式
+│   │   │   └── ErrorCode.java           # 错误码定义
+│   │   └── exception/                   # 异常处理
+│   │       ├── BusinessException.java   # 业务异常
+│   │       └── GlobalExceptionHandler.java # 全局异常处理
 │   └── resources/
-│       ├── application.yaml             # 配置文件
-│       ├── schema.sql                   # 数据库表定义
-│       ├── init.sql                     # 初始化数据
-│       └── mapper/
-│           └── UserMapper.xml           # MyBatis SQL映射
+│       ├── application.yaml             # 主配置文件
+│       ├── application-dev.yaml         # 开发环境配置
+│       ├── application-prod.yaml        # 生产环境配置
+│       ├── mapper/
+│   │       └── UserMapper.xml           # MyBatis SQL映射
+│       └── init.sql                     # 初始化数据
 ├── test/
 │   └── java/com/xianggui/app/
 │       └── AppApplicationTests.java     # 测试类
 └── pom.xml                              # Maven配置
-
 ```
+
+## 配置文件说明
+
+### 主配置文件 (application.yaml)
+```yaml
+spring:
+  profiles:
+    active: dev  # 激活开发环境配置
+```
+
+### 开发环境配置 (application-dev.yaml)
+包含详细的开发环境配置：
+- 数据库连接（Hikari连接池）
+- Redis配置
+- 日志级别（DEBUG）
+- JWT密钥（开发环境默认值）
+- 验证码过期时间
+- 登录安全策略
+
+### 生产环境配置 (application-prod.yaml)
+生产环境专用配置：
+- 环境变量驱动的数据库/Redis配置
+- 文件日志输出
+- 更严格的CORS策略
+- 必须通过环境变量设置JWT密钥
+
+### 配置属性类 (AppProperties)
+集中管理所有自定义配置：
+```java
+app:
+  jwt:
+    secret: ${JWT_SECRET}
+    access-token-expire: 604800
+  captcha:
+    sms:
+      expire-seconds: 300
+      rate-limit-seconds: 60
+  security:
+    login:
+      max-fail-attempts: 5
+      lock-duration-minutes: 30
+```
+
+## API文档访问
+
+启动应用后，可通过以下地址访问API文档：
+
+- **Swagger UI**: http://localhost:8080/swagger-ui.html
+- **OpenAPI JSON**: http://localhost:8080/v3/api-docs
+- **OpenAPI YAML**: http://localhost:8080/v3/api-docs.yaml
+
+## 接口列表
+
+### 认证管理接口 (/api/v1/auth)
+
+#### 1. 发送注册验证码
+```http
+POST /api/v1/auth/register/sms-code
+Content-Type: application/json
+
+请求体:
+{
+  "mobile": "13800138000",
+  "username": "test_user"
+}
+
+成功响应 (200):
+{
+  "code": 200,
+  "message": "验证码发送成功",
+  "data": null,
+  "timestamp": 1727164800000,
+  "requestId": "req_123456"
+}
+
+错误响应:
+- 400: 参数校验失败
+- 4001: 手机号格式错误
+- 4002: 用户名格式错误
+- 4003: 手机号已注册
+- 4004: 用户名已存在
+- 4301: 请求过于频繁
+```
+
+#### 2. 用户注册
+```http
+POST /api/v1/auth/register
+Content-Type: application/json
+
+请求体:
+{
+  "username": "test_user",
+  "mobile": "13800138000",
+  "code": "123456"
+}
+
+成功响应 (200):
+{
+  "code": 200,
+  "message": "注册成功",
+  "data": {
+    "user_id": 12345,
+    "username": "test_user",
+    "token": "eyJhbGciOiJIUzI1NiIs...",
+    "token_type": "Bearer",
+    "expires_in": 604800,
+    "need_create_avatar": true
+  },
+  "timestamp": 1727164800000,
+  "requestId": "req_123456"
+}
+
+错误响应:
+- 400: 参数校验失败
+- 4101: 验证码错误
+- 4102: 验证码已过期
+```
+
+#### 3. 密码登录
+```http
+POST /api/v1/auth/login/password
+Content-Type: application/json
+
+请求体:
+{
+  "mobile": "13800138000",
+  "password": "password123",
+  "remember_me": true
+}
+
+成功响应 (200):
+{
+  "code": 200,
+  "message": "登录成功",
+  "data": {
+    "user_id": 12345,
+    "username": "test_user",
+    "mobile": "13800138000",
+    "token": "eyJhbGciOiJIUzI1NiIs...",
+    "token_type": "Bearer",
+    "expires_in": 2592000,
+    "avatar_created": true
+  },
+  "timestamp": 1727164800000,
+  "requestId": "req_123456"
+}
+
+错误响应:
+- 400: 参数校验失败
+- 4201: 手机号或密码错误
+- 4202: 账号已被锁定
+- 4203: 该手机号未注册
+```
+
+#### 4. 短信验证码登录
+```http
+POST /api/v1/auth/login/sms
+Content-Type: application/json
+
+请求体:
+{
+  "mobile": "13800138000",
+  "code": "123456"
+}
+
+成功响应: 同密码登录
+
+错误响应:
+- 400: 参数校验失败
+- 4101: 验证码错误
+- 4202: 账号已被锁定
+- 4203: 该手机号未注册
+```
+
+#### 5. 发送重置密码验证码
+```http
+POST /api/v1/auth/password/reset-sms
+Content-Type: application/json
+
+请求体:
+{
+  "mobile": "13800138000"
+}
+
+成功响应 (200):
+{
+  "code": 200,
+  "message": "验证码发送成功",
+  "data": null,
+  "timestamp": 1727164800000,
+  "requestId": "req_123456"
+}
+
+错误响应:
+- 400: 参数校验失败
+- 4203: 该手机号未注册
+- 4301: 请求过于频繁
+```
+
+#### 6. 重置密码
+```http
+POST /api/v1/auth/password/reset
+Content-Type: application/json
+
+请求体:
+{
+  "mobile": "13800138000",
+  "code": "123456",
+  "new_password": "newpassword123",
+  "confirm_password": "newpassword123"
+}
+
+成功响应 (200):
+{
+  "code": 200,
+  "message": "密码重置成功",
+  "data": null,
+  "timestamp": 1727164800000,
+  "requestId": "req_123456"
+}
+
+错误响应:
+- 400: 参数校验失败
+- 4101: 验证码错误
+- 4401: 密码格式错误
+- 4402: 两次输入的密码不一致
+```
+
+#### 7. 获取图形验证码
+```http
+GET /api/v1/auth/captcha
+
+成功响应 (200):
+{
+  "code": 200,
+  "message": "success",
+  "data": {
+    "captcha_key": "captcha_1234567890",
+    "image_data": "data:image/png;base64,iVBORw0KGgoAAAAN...",
+    "expire_in": 300
+  },
+  "timestamp": 1727164800000,
+  "requestId": "req_123456"
+}
+```
+
+#### 8. 检查用户名是否可用
+```http
+GET /api/v1/auth/check-username?username=test_user
+
+成功响应 (200) - 可用:
+{
+  "code": 200,
+  "message": "success",
+  "data": {
+    "available": true,
+    "suggestions": null
+  },
+  "timestamp": 1727164800000,
+  "requestId": "req_123456"
+}
+
+成功响应 (200) - 已存在:
+{
+  "code": 200,
+  "message": "success",
+  "data": {
+    "available": false,
+    "suggestions": ["test_user1", "test_user2"]
+  },
+  "timestamp": 1727164800000,
+  "requestId": "req_123456"
+}
+
+错误响应:
+- 400: 用户名格式错误
+```
+
+## 错误码列表
+
+| 错误码 | 描述 | HTTP状态码 |
+|--------|------|-----------|
+| 400 | 参数校验失败 | 400 |
+| 4001 | 手机号格式错误 | 200 |
+| 4002 | 用户名格式错误 | 200 |
+| 4003 | 手机号已注册 | 200 |
+| 4004 | 用户名已存在 | 200 |
+| 4101 | 验证码错误 | 200 |
+| 4102 | 验证码已过期 | 200 |
+| 4201 | 手机号或密码错误 | 200 |
+| 4202 | 账号已被锁定 | 200 |
+| 4203 | 该手机号未注册 | 200 |
+| 4301 | 请求过于频繁 | 200 |
+| 4401 | 密码格式错误 | 200 |
+| 4402 | 密码不一致 | 200 |
+| 5000 | 系统内部错误 | 200 |
 
 ## 数据库设计
 
@@ -78,295 +382,21 @@ CREATE TABLE users (
 
 ## Redis Key设计
 
-### 短信验证码
-```
-sms:code:{mobile}:{biz_type} = code
-过期时间: 5分钟
-```
-
-### 发送频率限制
-```
-sms:rate:limit:{mobile} = timestamp
-过期时间: 60秒
-```
-
-### 登录失败计数
-```
-login:fail:count:{mobile} = count
-过期时间: 1小时
-```
-
-### 账号锁定
-```
-login:lock:{mobile} = {"lock_until": timestamp, "reason": "too_many_failures"}
-过期时间: 30分钟
-```
-
-### 图形验证码
-```
-captcha:{captcha_key} = code
-过期时间: 5分钟
-```
-
-### 用户会话
-```
-session:token:{token} = {"user_id": 123, "username": "test", "mobile": "13800138000"}
-过期时间: 动态 (7天或30天)
-```
-
-## 公共响应格式
-
-```json
-{
-  "code": 200,
-  "message": "success",
-  "data": {},
-  "timestamp": 1727164800000,
-  "request_id": "req_123456"
-}
-```
-
-## 接口列表
-
-### 1. 认证相关接口 (/api/v1/auth)
-
-#### 1.1 发送注册验证码
-```
-POST /api/v1/auth/register/sms-code
-Content-Type: application/json
-
-请求体:
-{
-  "mobile": "13800138000",
-  "username": "test_user"
-}
-
-成功响应 (200):
-{
-  "code": 200,
-  "message": "验证码发送成功",
-  "data": null
-}
-
-错误响应:
-- 4001: 手机号格式错误
-- 4002: 用户名格式错误
-- 4003: 手机号已注册
-- 4004: 用户名已存在
-- 4301: 请求过于频繁，请60秒后重试
-```
-
-#### 1.2 用户注册
-```
-POST /api/v1/auth/register
-Content-Type: application/json
-
-请求体:
-{
-  "username": "test_user",
-  "mobile": "13800138000",
-  "code": "123456"
-}
-
-成功响应 (200):
-{
-  "code": 200,
-  "message": "注册成功",
-  "data": {
-    "user_id": 12345,
-    "username": "test_user",
-    "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
-    "token_type": "Bearer",
-    "expires_in": 604800,
-    "need_create_avatar": true
-  }
-}
-
-错误响应:
-- 4101: 验证码错误
-- 4102: 验证码已过期，请重新获取
-```
-
-#### 1.3 密码登录
-```
-POST /api/v1/auth/login/password
-Content-Type: application/json
-
-请求体:
-{
-  "mobile": "13800138000",
-  "password": "password123",
-  "remember_me": true
-}
-
-成功响应 (200):
-{
-  "code": 200,
-  "message": "登录成功",
-  "data": {
-    "user_id": 12345,
-    "username": "test_user",
-    "mobile": "13800138000",
-    "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
-    "token_type": "Bearer",
-    "expires_in": 2592000,
-    "avatar_created": true,
-    "avatar_config": {"hair": "style1", "clothes": "style2"}
-  }
-}
-
-错误响应:
-- 4201: 手机号或密码错误
-- 4202: 账号已被锁定，请30分钟后再试
-- 4203: 该手机号未注册
-```
-
-#### 1.4 短信验证码登录
-```
-POST /api/v1/auth/login/sms
-Content-Type: application/json
-
-请求体:
-{
-  "mobile": "13800138000",
-  "code": "123456"
-}
-
-成功响应: 同密码登录
-```
-
-#### 1.5 发送重置密码验证码
-```
-POST /api/v1/auth/password/reset-sms
-Content-Type: application/json
-
-请求体:
-{
-  "mobile": "13800138000"
-}
-
-成功响应 (200):
-{
-  "code": 200,
-  "message": "验证码发送成功",
-  "data": null
-}
-
-错误响应:
-- 4203: 该手机号未注册
-- 4301: 请求过于频繁，请60秒后重试
-```
-
-#### 1.6 重置密码
-```
-POST /api/v1/auth/password/reset
-Content-Type: application/json
-
-请求体:
-{
-  "mobile": "13800138000",
-  "code": "123456",
-  "new_password": "newpassword123",
-  "confirm_password": "newpassword123"
-}
-
-成功响应 (200):
-{
-  "code": 200,
-  "message": "密码重置成功",
-  "data": null
-}
-
-错误响应:
-- 4101: 验证码错误
-- 4401: 密码格式错误，支持6-20位中英文、数字或特殊字符
-- 4402: 两次输入的密码不一致
-```
-
-#### 1.7 获取图形验证码
-```
-GET /api/v1/auth/captcha
-
-成功响应 (200):
-{
-  "code": 200,
-  "data": {
-    "captcha_key": "captcha_123456",
-    "image_data": "data:image/png;base64,iVBORw0KGgoAAAAN...",
-    "expire_in": 300
-  }
-}
-```
-
-#### 1.8 检查用户名是否可用
-```
-GET /api/v1/auth/check-username?username=test_user
-
-成功响应 (200):
-{
-  "code": 200,
-  "data": {
-    "available": true,
-    "suggestions": null
-  }
-}
-
-用户名已存在时:
-{
-  "code": 200,
-  "data": {
-    "available": false,
-    "suggestions": ["test_user1", "test_user2"]
-  }
-}
-```
-
-## 错误码列表
-
-| 错误码 | 描述 |
-|--------|------|
-| 4001 | 手机号格式错误 |
-| 4002 | 用户名格式错误 |
-| 4003 | 手机号已注册 |
-| 4004 | 用户名已存在 |
-| 4101 | 验证码错误 |
-| 4102 | 验证码已过期 |
-| 4201 | 手机号或密码错误 |
-| 4202 | 账号已被锁定 |
-| 4203 | 该手机号未注册 |
-| 4301 | 请求过于频繁 |
-| 4401 | 密码格式错误 |
-| 4402 | 密码不一致 |
-
-## 业务流程
-
-### 注册流程
-1. 用户输入手机号和用户名
-2. 调用 `/register/sms-code` 获取验证码
-3. 用户输入验证码
-4. 调用 `/register` 完成注册
-5. 返回token和用户信息，标记需要创建虚拟形象
-
-### 登录流程
-1. 用户输入手机号和密码（或验证码）
-2. 调用 `/login/password` 或 `/login/sms` 进行登录
-3. 系统检查账号锁定状态
-4. 验证密码或验证码
-5. 返回token和完整用户信息
-
-### 密码找回流程
-1. 用户输入手机号
-2. 调用 `/password/reset-sms` 获取验证码
-3. 用户输入新密码和验证码
-4. 调用 `/password/reset` 重置密码
-5. 返回成功消息
+| Key模式 | 说明 | 过期时间 |
+|---------|------|---------|
+| `sms:code:{mobile}:{biz_type}` | 短信验证码 | 5分钟 |
+| `sms:rate:limit:{mobile}` | 发送频率限制 | 60秒 |
+| `login:fail:count:{mobile}` | 登录失败计数 | 1小时 |
+| `login:lock:{mobile}` | 账号锁定 | 30分钟 |
+| `captcha:{captcha_key}` | 图形验证码 | 5分钟 |
+| `session:token:{token}` | 用户会话 | 7天/30天 |
 
 ## 安全措施
 
 ### 短信验证码
-- 过期时间: 5分钟
+- 过期时间: 5分钟（可配置）
 - 发送频率限制: 60秒内只能发送1次
-- 每日发送限制: 可在Redis中配置
+- 每日发送上限: 10次
 
 ### 登录防护
 - 连续失败5次锁定账号30分钟
@@ -391,55 +421,82 @@ GET /api/v1/auth/check-username?username=test_user
 2. Redis 服务器
 3. Java 21 JDK
 
-### 配置文件修改
-编辑 `application.yaml`:
-```yaml
-spring:
-  datasource:
-    url: jdbc:mysql://your-db-host:3306/xianggui?useSSL=false&serverTimezone=UTC&characterEncoding=utf8mb4
-    username: your-db-user
-    password: your-db-password
-  redis:
-    host: your-redis-host
-    port: 6379
+### 环境变量配置（生产环境必需）
+```bash
+# 数据库
+export DB_HOST=localhost
+export DB_PORT=3306
+export DB_NAME=xianggui
+export DB_USERNAME=root
+export DB_PASSWORD=your_password
+
+# Redis
+export REDIS_HOST=localhost
+export REDIS_PORT=6379
+export REDIS_PASSWORD=your_password
+
+# JWT（必须设置强密钥）
+export JWT_SECRET=your-strong-secret-key-at-least-32-characters
+
+# CORS（生产环境限制域名）
+export CORS_ALLOWED_ORIGINS=https://your-frontend.com
 ```
 
 ### 初始化数据库
 ```sql
--- 执行 init.sql 或 schema.sql
+-- 执行 init.sql
 source /path/to/init.sql;
 ```
 
 ### 编译运行
 ```bash
-# 编译
-mvn clean compile
+# 开发环境
+mvn spring-boot:run -Dspring-boot.run.profiles=dev
 
-# 打包
+# 生产环境
 mvn clean package
-
-# 运行
-mvn spring-boot:run
-# 或
-java -jar target/app-0.0.1-SNAPSHOT.jar
+java -jar target/app-0.0.1-SNAPSHOT.jar --spring.profiles.active=prod
 ```
 
 ### 访问应用
 - 服务地址: http://localhost:8080
 - API根路径: http://localhost:8080/api/v1/auth
+- API文档: http://localhost:8080/swagger-ui.html
 
-## 开发说明
+## 架构改进说明
 
-### 添加新接口步骤
-1. 在 `AuthController` 中添加方法
-2. 在 `AuthService` 中实现业务逻辑
-3. 如需要数据库操作，在 `UserMapper` 中添加方法和XML映射
-4. 创建相应的DTO类用于请求/响应
-5. 编写单元测试
+### 本次优化内容
 
-### 扩展建议
+1. **配置外部化**
+   - 创建 `application-dev.yaml` 和 `application-prod.yaml`
+   - 使用 `AppProperties` 类统一管理配置
+   - JWT密钥、验证码过期时间等敏感/可变配置全部外部化
+
+2. **参数校验增强**
+   - 所有DTO添加 `@Valid` 校验注解
+   - Controller层使用 `@Validated` 注解
+   - 添加全局异常处理 `GlobalExceptionHandler`
+
+3. **API文档自动化**
+   - 集成 SpringDoc OpenAPI
+   - Controller和DTO添加 Swagger 注解
+   - 访问 `/swagger-ui.html` 查看交互式文档
+
+4. **代码结构优化**
+   - 添加 `config` 包管理配置类
+   - 添加 `exception` 包管理异常处理
+   - 工具类改为使用配置属性而非硬编码
+
+5. **安全性提升**
+   - JWT密钥通过环境变量注入
+   - 生产环境配置强制要求设置密钥
+   - 验证码长度、过期时间可配置
+
+### 后续扩展建议
+
 1. 添加JWT验证拦截器进行权限管理
-2. 集成真实短信服务（如阿里云、腾讯云）
+2. 集成真实短信服务（阿里云、腾讯云）
 3. 完善图形验证码生成和验证逻辑
-4. 添加日志记录和监控
+4. 添加日志记录和监控（Micrometer + Prometheus）
 5. 实现虚拟形象相关接口
+6. 添加单元测试和集成测试

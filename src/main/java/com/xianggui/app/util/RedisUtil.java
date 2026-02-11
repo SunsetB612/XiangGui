@@ -1,6 +1,8 @@
 package com.xianggui.app.util;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.xianggui.app.config.AppProperties;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Component;
 
@@ -9,12 +11,16 @@ import java.util.concurrent.TimeUnit;
 
 @Component
 public class RedisUtil {
+
     private final StringRedisTemplate redisTemplate;
     private final ObjectMapper objectMapper;
+    private final AppProperties appProperties;
 
-    public RedisUtil(StringRedisTemplate redisTemplate, ObjectMapper objectMapper) {
+    @Autowired
+    public RedisUtil(StringRedisTemplate redisTemplate, ObjectMapper objectMapper, AppProperties appProperties) {
         this.redisTemplate = redisTemplate;
         this.objectMapper = objectMapper;
+        this.appProperties = appProperties;
     }
 
     /**
@@ -22,7 +28,8 @@ public class RedisUtil {
      */
     public void setSmsCode(String mobile, String codeType, String code) {
         String key = "sms:code:" + mobile + ":" + codeType;
-        redisTemplate.opsForValue().set(key, code, 5, TimeUnit.MINUTES);
+        long expireSeconds = appProperties.getCaptcha().getSms().getExpireSeconds();
+        redisTemplate.opsForValue().set(key, code, expireSeconds, TimeUnit.SECONDS);
     }
 
     /**
@@ -46,10 +53,7 @@ public class RedisUtil {
      */
     public boolean checkSmsRateLimit(String mobile) {
         String key = "sms:rate:limit:" + mobile;
-        if (redisTemplate.hasKey(key)) {
-            return false; // 仍在限制期内
-        }
-        return true; // 可以发送
+        return !redisTemplate.hasKey(key);
     }
 
     /**
@@ -57,7 +61,8 @@ public class RedisUtil {
      */
     public void setSmsRateLimit(String mobile) {
         String key = "sms:rate:limit:" + mobile;
-        redisTemplate.opsForValue().set(key, System.currentTimeMillis() + "", 60, TimeUnit.SECONDS);
+        long rateLimitSeconds = appProperties.getCaptcha().getSms().getRateLimitSeconds();
+        redisTemplate.opsForValue().set(key, System.currentTimeMillis() + "", rateLimitSeconds, TimeUnit.SECONDS);
     }
 
     /**
@@ -66,8 +71,9 @@ public class RedisUtil {
     public void recordLoginFailure(String mobile) {
         String key = "login:fail:count:" + mobile;
         Long count = redisTemplate.opsForValue().increment(key);
-        if (count == 1) {
-            redisTemplate.expire(key, 1, TimeUnit.HOURS);
+        if (count != null && count == 1) {
+            long expireMinutes = appProperties.getSecurity().getLogin().getFailCountExpireMinutes();
+            redisTemplate.expire(key, expireMinutes, TimeUnit.MINUTES);
         }
     }
 
@@ -93,15 +99,17 @@ public class RedisUtil {
      */
     public void lockAccount(String mobile, String reason) {
         String key = "login:lock:" + mobile;
+        long lockDurationMinutes = appProperties.getSecurity().getLogin().getLockDurationMinutes();
         Map<String, Object> lockInfo = Map.of(
-            "lock_until", System.currentTimeMillis() + 30 * 60 * 1000,
+            "lock_until", System.currentTimeMillis() + lockDurationMinutes * 60 * 1000,
             "reason", reason,
-            "fail_count", 5
+            "fail_count", appProperties.getSecurity().getLogin().getMaxFailAttempts()
         );
         try {
             String value = objectMapper.writeValueAsString(lockInfo);
-            redisTemplate.opsForValue().set(key, value, 30, TimeUnit.MINUTES);
+            redisTemplate.opsForValue().set(key, value, lockDurationMinutes, TimeUnit.MINUTES);
         } catch (Exception e) {
+            // Warning: 生产环境应使用日志框架
             e.printStackTrace();
         }
     }
@@ -111,7 +119,7 @@ public class RedisUtil {
      */
     public boolean isAccountLocked(String mobile) {
         String key = "login:lock:" + mobile;
-        return redisTemplate.hasKey(key);
+        return Boolean.TRUE.equals(redisTemplate.hasKey(key));
     }
 
     /**
@@ -127,7 +135,8 @@ public class RedisUtil {
      */
     public void setCaptcha(String captchaKey, String code) {
         String key = "captcha:" + captchaKey;
-        redisTemplate.opsForValue().set(key, code, 5, TimeUnit.MINUTES);
+        long expireSeconds = appProperties.getCaptcha().getImage().getExpireSeconds();
+        redisTemplate.opsForValue().set(key, code, expireSeconds, TimeUnit.SECONDS);
     }
 
     /**

@@ -1,6 +1,10 @@
 package com.xianggui.app.common;
 
 public class ErrorCode {
+    // 通用错误
+    public static final Integer INTERNAL_ERROR = 5000;
+    public static final Integer PARAM_ERROR = 4000;
+
     // 手机号格式错误
     public static final Integer INVALID_MOBILE = 4001;
     // 用户名格式错误

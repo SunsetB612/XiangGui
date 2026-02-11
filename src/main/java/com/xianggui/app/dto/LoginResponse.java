@@ -1,29 +1,36 @@
 package com.xianggui.app.dto;
 
-import com.fasterxml.jackson.annotation.JsonProperty;
+import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
-import java.util.Map;
-
 @Data
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
+@Schema(description = "登录响应")
 public class LoginResponse {
-    @JsonProperty("user_id")
+
+    @Schema(description = "用户ID", example = "12345")
     private Long userId;
+
+    @Schema(description = "用户名", example = "test_user")
     private String username;
+
+    @Schema(description = "手机号", example = "13800138000")
     private String mobile;
+
+    @Schema(description = "访问令牌", example = "eyJhbGciOiJIUzI1NiIs...")
     private String token;
-    @JsonProperty("token_type")
+
+    @Schema(description = "令牌类型", example = "Bearer")
     private String tokenType;
-    @JsonProperty("expires_in")
+
+    @Schema(description = "过期时间（秒）", example = "604800")
     private Long expiresIn;
-    @JsonProperty("avatar_created")
+
+    @Schema(description = "是否已创建虚拟形象", example = "true")
     private Boolean avatarCreated;
-    @JsonProperty("avatar_config")
-    private Map<String, String> avatarConfig;
 }

@@ -32,6 +32,11 @@ build/
 ### VS Code ###
 .vscode/
 
+### Trae IDE ###
+.trae/
+.trae/rules/
+.trae/skills/
+
 # Compiled class file
 *.class
 
